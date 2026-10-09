@@ -1,6 +1,8 @@
 // Whimsical garden design (see concept/paths.html for the plan and numbering).
 // Same coordinate system as layout.js: x → east, z → south, y → up, metres.
 
+import { groundY, drape } from '../terrain.js';
+
 export function buildWhimsical(ctx) {
   const { THREE, L, mat, add, box, patch, canvasTexture, fenceSeg, youngTree, rand, label, night, parent, diningSet } = ctx;
   const V2 = THREE.Vector2;
@@ -42,7 +44,7 @@ export function buildWhimsical(ctx) {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
     g.computeVertexNormals();
-    return add(new THREE.Mesh(g, material), { cast: false });
+    return drape(add(new THREE.Mesh(g, material), { cast: false }));
   }
 
   // Batches many small meshes into InstancedMeshes (one per geometry+material).
@@ -52,7 +54,7 @@ export function buildWhimsical(ctx) {
     const key = geo.uuid + material.uuid;
     if (!batches.has(key)) batches.set(key, { geo, material, items: [] });
     _q.setFromEuler(_e.set(rx, ry, rz));
-    _m.compose(new THREE.Vector3(x, y, z), _q, new THREE.Vector3(sx, sy, sz));
+    _m.compose(new THREE.Vector3(x, y + groundY(x, z), z), _q, new THREE.Vector3(sx, sy, sz)); // all instances sit on the lawn
     batches.get(key).items.push({ m: _m.clone(), color });
   }
   function flushBatches() {
@@ -264,13 +266,14 @@ export function buildWhimsical(ctx) {
     for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / 0.9, pos.getZ(i) / 0.9);
     const m = add(new THREE.Mesh(g, M2.checker), { cast: false });
     m.position.set(16.75, 0.016, 14.4);
+    drape(m);
     ribbon(svgCurve('M18.05 14.4 L18.4 14.4'), 0.55, 0.016, M2.checker, 0.9); // to the greenhouse door
   }
 
   // Checkerboard patch under the seating nook.
-  patch({ x0: 0.2, x1: 2.6, z0: -5.6, z1: -4.0 }, 0.014, M2.checker, 0.9);
+  drape(patch({ x0: 0.2, x1: 2.6, z0: -5.6, z1: -4.0 }, 0.014, M2.checker, 0.9, 0.2));
   // Shed apron.
-  patch({ x0: 6.0, x1: 6.8, z0: -5.1, z1: -1.9 }, 0.03, mat.pavers, 1.6);
+  drape(patch({ x0: 6.0, x1: 6.8, z0: -5.1, z1: -1.9 }, 0.03, mat.pavers, 1.6, 0.2));
 
   // ---------- structures ----------
   // Garden shed 4.00 × 2.14, doors facing west (concept #14).
@@ -485,7 +488,8 @@ export function buildWhimsical(ctx) {
         y += h * 1.8;
       }
     };
-    const g = new THREE.Mesh(new THREE.CircleGeometry(0.7, 28), M2.gravel); g.rotation.x = -Math.PI / 2; g.position.set(1.7, 0.012, 14.3 + dz); add(g, { cast: false });
+    const cg = new THREE.CircleGeometry(0.7, 28); cg.rotateX(-Math.PI / 2);
+    const g = new THREE.Mesh(cg, M2.gravel); g.position.set(1.7, 0.012, 14.3 + dz); drape(add(g, { cast: false }));
     cairn(1.5, 14.1 + dz, 6); cairn(1.95, 14.45 + dz, 5); cairn(1.4, 14.6 + dz, 4); cairn(2.0, 14.0 + dz, 3);
     cairn(13.2, 15.3, 4); cairn(12.1, 15.4, 3);
   }
@@ -535,7 +539,7 @@ export function buildWhimsical(ctx) {
   }
   youngTree(4.2, 15.6);           // peach tree, moved (#9)
   youngTree(-3.2, -4.2);          // existing young tree on the north lawn
-  youngTree(5.3, -5.95, 0, 0.7);  // small sapling, moved into the cottage border
+  youngTree(5.3, -5.95, null, 0.7); // small sapling, moved into the cottage border
   lamp(4.2, 0.5, 15.1, 2.5, 4);
   inst(G.cyl, upMat, 4.2, 0, 15.15, 0.05, 0.06, 0.05);
   // Twisted hazel in the mythical corner.
@@ -624,7 +628,8 @@ export function buildWhimsical(ctx) {
   // Kitchen corner: planned second bed becomes real; greens in both beds (#5).
   {
     const nb = L.raisedBeds.find(b => b.planned);
-    box(nb.x0, nb.x1, 0, nb.h, nb.z0, nb.z1, mat.metal);
+    const gy = groundY((nb.x0 + nb.x1) / 2, (nb.z0 + nb.z1) / 2);
+    box(nb.x0, nb.x1, gy - 0.1, gy + nb.h, nb.z0, nb.z1, mat.metal);
     for (const b of L.raisedBeds.filter(b => !b.tree)) {
       for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) mound(b.x0 + 0.2 + i * 0.32, b.z0 + 0.22 + j * 0.33, 0.13, 0.8, pick([0x6fa84a, 0x8cc05a, 0x5e8f3a, 0x9a4a6a]), b.h);
     }

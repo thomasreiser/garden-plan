@@ -6,6 +6,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import * as L from './layout.js';
 import { buildWhimsical } from './scenes/whimsical.js';
 import { diningSet } from './furniture.js';
+import { groundY, drape } from './terrain.js';
 
 // ---------- renderer / scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -132,9 +133,9 @@ function box(x0, x1, y0, y1, z0, z1, material, opts) {
 }
 
 // Flat ground patch with a world-scale texture (texture repeats every `tile` metres).
-function patch(r, y, material, tile = 1) {
+function patch(r, y, material, tile = 1, cell = 0) {
   const w = r.x1 - r.x0, d = r.z1 - r.z0;
-  const g = new THREE.PlaneGeometry(w, d);
+  const g = cell ? new THREE.PlaneGeometry(w, d, Math.ceil(w / cell), Math.ceil(d / cell)) : new THREE.PlaneGeometry(w, d);
   g.rotateX(-Math.PI / 2);
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / tile, uv.getY(i) * d / tile);
@@ -146,7 +147,7 @@ function patch(r, y, material, tile = 1) {
 // ---------- ground ----------
 const P = L.plot;
 patch({ x0: -80, x1: 90, z0: -80, z1: 90 }, -0.02, mat.meadow, 4);
-patch({ x0: P.west, x1: P.east, z0: P.north, z1: P.south }, 0, mat.grass, 2);
+drape(patch({ x0: P.west, x1: P.east, z0: P.north, z1: P.south }, 0, mat.grass, 2, 0.25)); // gently uneven lawn
 
 // Terrain behind the retaining wall is higher (photos): raise the strip west and south-west.
 const lw = L.boundary.lWallHeight;
@@ -315,8 +316,9 @@ const variants = { status: new THREE.Group(), whimsical: new THREE.Group() };
 scene.add(variants.status, variants.whimsical);
 
 for (const b of L.raisedBeds) {
-  if (b.planned) inGroup(variants.status, () => ghostBox(b.x0, b.x1, 0, b.h, b.z0, b.z1));
-  else box(b.x0, b.x1, 0, b.h, b.z0, b.z1, mat.metal);
+  const gy = b.tree ? 0 : groundY((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2); // beds stand on the rising ground
+  if (b.planned) inGroup(variants.status, () => ghostBox(b.x0, b.x1, gy, gy + b.h, b.z0, b.z1));
+  else box(b.x0, b.x1, gy - 0.1, gy + b.h, b.z0, b.z1, mat.metal);
 }
 {
   const hp = L.heatPump;
@@ -331,7 +333,7 @@ for (const s of L.steppingStones) {
     const x = (1 - t) ** 2 * s.from[0] + 2 * (1 - t) * t * s.via[0] + t * t * s.to[0];
     const z = (1 - t) ** 2 * s.from[1] + 2 * (1 - t) * t * s.via[1] + t * t * s.to[1];
     const st = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.04, 9), mat.stone);
-    st.position.set(x, 0.02, z);
+    st.position.set(x, 0.02 + groundY(x, z), z);
     st.rotation.y = Math.random() * Math.PI;
     st.scale.x = 1.2;
     add(st, { cast: false });
@@ -502,7 +504,8 @@ function tree(x, z, y = 0, { h = 8, r = 2.5, kind = 'leaf' } = {}) {
   parent.add(g);
 }
 
-function youngTree(x, z, y = 0, scale = 1) {
+function youngTree(x, z, y = null, scale = 1) {
+  y ??= groundY(x, z);
   const g = new THREE.Group();
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.6, 5), mat.trunk);
   trunk.position.y = 0.8;
@@ -514,7 +517,16 @@ function youngTree(x, z, y = 0, scale = 1) {
   g.scale.setScalar(scale);
   parent.add(g);
 }
-inGroup(variants.status, () => L.youngTrees.forEach(([x, z, scale]) => youngTree(x, z, 0, scale)));
+inGroup(variants.status, () => L.youngTrees.forEach(([x, z, scale]) => youngTree(x, z, null, scale)));
+// Bare soil heaps on the south-east lawn (photos; status quo only).
+{
+  const soil = new THREE.MeshStandardMaterial({ map: tex.chips, color: 0x9a7a58, roughness: 1 });
+  for (const [x, z, r, h] of [[18.6, 14.9, 0.9, 0.28], [17.3, 15.8, 0.6, 0.18]]) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), soil);
+    m.scale.set(r, h, r * 0.8); m.position.set(x, groundY(x, z) - 0.02, z);
+    inGroup(variants.status, () => add(m));
+  }
+}
 // Existing dining set on the terrace (status quo position: middle of the terrace, along the house).
 diningSet(variants.status, -2.4, 4.2, Math.PI / 2);
 for (const b of L.raisedBeds) if (b.tree) youngTree((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, b.h);
@@ -627,7 +639,8 @@ inGroup(variants.whimsical, () => buildWhimsical({
   }
   // Existing LED strip around the top border of the raised bed.
   for (const b of L.raisedBeds.filter(b => !b.planned && !b.tree)) {
-    const y = b.h - 0.03, t = 0.025, o = 0.012;
+    const gy = groundY((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2);
+    const y = gy + b.h - 0.03, t = 0.025, o = 0.012;
     for (const [x0, x1, z0, z1] of [[b.x0 - o, b.x1 + o, b.z0 - o, b.z0 - o + t], [b.x0 - o, b.x1 + o, b.z1 + o - t, b.z1 + o],
       [b.x0 - o, b.x0 - o + t, b.z0, b.z1], [b.x1 + o - t, b.x1 + o, b.z0, b.z1]]) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.02, z1 - z0), strip);
@@ -635,7 +648,7 @@ inGroup(variants.whimsical, () => buildWhimsical({
       scene.add(m);
     }
     const pl = new THREE.PointLight(0xffc878, 1.2, 3, 2);
-    pl.position.set((b.x0 + b.x1) / 2, b.h + 0.4, (b.z0 + b.z1) / 2);
+    pl.position.set((b.x0 + b.x1) / 2, gy + b.h + 0.4, (b.z0 + b.z1) / 2);
     night.lights.add(pl);
   }
 }
@@ -705,6 +718,11 @@ function setView(name) {
   if (parts.includes('whimsical')) state.variant = 'whimsical';
   if (parts.includes('night')) state.night = true;
   if (parts.includes('nolabels')) labels.visible = false;
+  if (parts.includes('fps')) { // debug: log frames per second and draw calls
+    let n = 0; const t0 = performance.now();
+    const tick = () => { n++; if (performance.now() - t0 < 6000) requestAnimationFrame(tick); else console.log(`FPS ${(n / 6).toFixed(1)} calls ${renderer.info.render.calls} tris ${renderer.info.render.triangles} lights ${night.lights.children.length}`); };
+    requestAnimationFrame(tick);
+  }
   applyState();
 }
 
