@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Garden 3D</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #c9d3dc; font: 14px/1.4 system-ui, sans-serif; }
+  canvas { display: block; }
+  #hud { position: fixed; top: 12px; left: 12px; max-width: 320px; padding: 12px 14px; border-radius: 10px;
+         background: rgba(20, 24, 28, 0.72); color: #eef1f4; backdrop-filter: blur(6px); }
+  #hud h1 { margin: 0 0 6px; font-size: 15px; }
+  #hud p { margin: 4px 0; color: #c3cad1; }
+  #hud kbd { display: inline-block; min-width: 1.4em; padding: 0 4px; border-radius: 4px; background: #39414a; color: #fff; text-align: center; font: 12px/1.6 ui-monospace, monospace; }
+  #views { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  #views button { padding: 5px 9px; border: 0; border-radius: 6px; background: #3b4550; color: #fff; cursor: pointer; font: inherit; font-size: 13px; }
+  #views button:hover { background: #4f5c69; }
+  body.flying #hud { opacity: 0.25; pointer-events: none; }
+  .seg { display: flex; gap: 4px; padding: 3px; margin: 6px 0 8px; border-radius: 8px; background: #2a3138; }
+  .seg button { flex: 1; padding: 5px 8px; border: 0; border-radius: 6px; background: none; color: #c3cad1; cursor: pointer; font: inherit; font-size: 13px; }
+  .seg button[aria-pressed="true"] { background: #4f5c69; color: #fff; }
+  .seg #night { flex: 0 0 auto; }
+</style>
+<script type="importmap">
+  { "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  } }
+</script>
+</head>
+<body>
+<div id="hud">
+  <h1>Garden 3D</h1>
+  <div class="seg" role="group" aria-label="Scene">
+    <button data-variant="status" aria-pressed="true">Status quo</button>
+    <button data-variant="whimsical" aria-pressed="false">Whimsical</button>
+    <button id="night" aria-pressed="false">☀ Day</button>
+  </div>
+  <p><b>Click</b> the scene to fly, <kbd>Esc</kbd> to release the mouse.</p>
+  <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd>/<kbd>Q</kbd> up/down · <kbd>Shift</kbd> fast · <kbd>L</kbd> labels · <kbd>V</kbd> scene · <kbd>N</kbd> night</p>
+  <div id="views">
+    <button data-view="overview">1 Overview</button>
+    <button data-view="top">2 Top</button>
+    <button data-view="terrace">3 Terrace</button>
+    <button data-view="street">4 Street</button>
+    <button data-view="playarea">5 Play area</button>
+    <button data-view="south">6 South lawn</button>
+    <button data-view="north">7 North lawn</button>
+    <button data-view="pavilion">8 Pavilion</button>
+    <button data-view="mythical">9 Mythical corner</button>
+    <button id="labels">Labels</button>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
