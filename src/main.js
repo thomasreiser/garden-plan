@@ -718,6 +718,7 @@ function setView(name) {
   if (parts.includes('whimsical')) state.variant = 'whimsical';
   if (parts.includes('night')) state.night = true;
   if (parts.includes('nolabels')) labels.visible = false;
+  if (parts.includes('nohud')) document.getElementById('hud').style.display = 'none';
   if (parts.includes('fps')) { // debug: log frames per second and draw calls
     let n = 0; const t0 = performance.now();
     const tick = () => { n++; if (performance.now() - t0 < 6000) requestAnimationFrame(tick); else console.log(`FPS ${(n / 6).toFixed(1)} calls ${renderer.info.render.calls} tris ${renderer.info.render.triangles} lights ${night.lights.children.length}`); };
@@ -727,12 +728,19 @@ function setView(name) {
 }
 
 const canvas = renderer.domElement;
-canvas.addEventListener('click', () => canvas.requestPointerLock());
+// Mouse look: pointer lock when the browser grants it; holding the left button and dragging always works too.
+let dragging = false;
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  dragging = true;
+  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* lock refused: drag still works */ }
+});
+addEventListener('mouseup', () => { dragging = false; });
 document.addEventListener('pointerlockchange', () => {
   document.body.classList.toggle('flying', document.pointerLockElement === canvas);
 });
 document.addEventListener('mousemove', e => {
-  if (document.pointerLockElement !== canvas) return;
+  if (document.pointerLockElement !== canvas && !dragging) return;
   yaw -= e.movementX * 0.0022;
   pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.0022, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
   look();
